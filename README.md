@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🔐 Store Key-Pairs
+# 🔐 Store Key-Pairs Blockchain
 
 ### **Enterprise-Grade Blockchain Data Storage Solution**
 
@@ -655,6 +655,6 @@ This project is provided as-is for demonstration and portfolio purposes.
 
 **Built with ❤️ using Hardhat 3, Express.js, and TypeScript**
 
-[⬆ Back to Top](#-store-key-pairs)
+[⬆ Back to Top](#-store-key-pairs-blockchain)
 
 </div>
