@@ -1,0 +1,39 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_28-5b44ea439af32f69a4428bbbc53aa95bac08a255",
+  "solcVersion": "0.8.28",
+  "solcLongVersion": "0.8.28+commit.7893614a",
+  "userSourceNameMap": {
+    "contracts/StoreData.sol": "project/contracts/StoreData.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode",
+            "evm.deployedBytecode",
+            "evm.methodIdentifiers",
+            "metadata"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/StoreData.sol": {
+        "content": "// SPDX-License-Identifier: UNLICENSED\r\n\r\npragma solidity ^0.8.28;\r\n\r\ncontract StoreData {\r\n    struct DataItem {\r\n        string value1;\r\n        string value2;\r\n    }\r\n\r\n    mapping(uint => DataItem) public data;\r\n\r\n    function storeData(\r\n        uint _key,\r\n        string memory _value1,\r\n        string memory _value2\r\n    ) public {\r\n        data[_key] = DataItem(_value1, _value2);\r\n    }\r\n\r\n    function getData(uint _key) public view returns (string memory, string memory) {\r\n         return (data[_key].value1, data[_key].value2);\r\n    }\r\n}\r\n"
+      }
+    }
+  }
+}

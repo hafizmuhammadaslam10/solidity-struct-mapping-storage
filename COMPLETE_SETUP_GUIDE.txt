@@ -1,0 +1,830 @@
+================================================================================
+COMPLETE GUIDE: EVM Project Setup, Deployment on Sepolia, and API Integration
+================================================================================
+
+This guide will walk you through creating a complete EVM project using Hardhat,
+deploying it to Sepolia testnet, and creating a Node.js API to interact with it
+via Postman.
+
+================================================================================
+PART 1: SETTING UP HARDHAT PROJECT
+================================================================================
+
+STEP 1: Create Project Directory
+---------------------------------
+mkdir hardhat-example
+cd hardhat-example
+
+
+STEP 2: Initialize Hardhat Project
+-----------------------------------
+npx hardhat --init
+
+When prompted, select:
+- Create a TypeScript project
+- Yes to install dependencies
+- Yes to add .gitignore
+
+
+STEP 3: Install Additional Dependencies
+----------------------------------------
+npm install dotenv
+npm install --save-dev @nomicfoundation/hardhat-ignition @nomicfoundation/hardhat-toolbox-viem
+
+
+STEP 4: Create Smart Contract
+------------------------------
+Create a file: contracts/StoreData.sol
+
+Copy the following code:
+
+// SPDX-License-Identifier: UNLICENSED
+
+pragma solidity ^0.8.28;
+
+contract StoreData {
+    struct DataItem {
+        string value1;
+        string value2;
+    }
+
+    mapping(uint => DataItem) public data;
+
+    function storeData(
+        uint _key,
+        string memory _value1,
+        string memory _value2
+    ) public {
+        data[_key] = DataItem(_value1, _value2);
+    }
+
+    function getData(uint _key) public view returns (string memory, string memory) {
+         return (data[_key].value1, data[_key].value2);
+    }
+}
+
+
+STEP 5: Create Ignition Module
+-------------------------------
+Create directory: ignition/modules
+
+Create file: ignition/modules/StoreData.ts
+
+Copy the following code:
+
+import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
+
+export default buildModule("StoreDataModule", (m) => {
+  const storeData = m.contract("StoreData");
+  return { storeData };
+});
+
+
+STEP 6: Create .env File
+-------------------------
+Create file: .env (in the hardhat-example root directory)
+
+Add the following variables:
+
+SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/YOUR_INFURA_KEY
+SEPOLIA_PRIVATE_KEY=your_private_key_here_without_0x_prefix
+
+IMPORTANT NOTES:
+- Get your Infura key from https://infura.io (create free account)
+- Get your private key from MetaMask or your wallet
+- NEVER commit .env file to git (it should be in .gitignore)
+
+
+STEP 7: Update hardhat.config.ts
+---------------------------------
+Replace the entire content of hardhat.config.ts with:
+
+import hardhatToolboxViemPlugin from "@nomicfoundation/hardhat-toolbox-viem";
+import { defineConfig } from "hardhat/config";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+export default defineConfig({
+  plugins: [hardhatToolboxViemPlugin],
+  solidity: {
+    version: "0.8.28",
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 200,
+      },
+    },
+  },
+  networks: {
+    hardhatMainnet: {
+      type: "edr-simulated",
+      chainType: "l1",
+    },
+    hardhatOp: {
+      type: "edr-simulated",
+      chainType: "op",
+    },
+    sepolia: {
+      type: "http",
+      chainType: "l1",
+      url: process.env.SEPOLIA_RPC_URL || "",
+      accounts: process.env.SEPOLIA_PRIVATE_KEY ? [process.env.SEPOLIA_PRIVATE_KEY] : [],
+    },
+  },
+});
+
+
+STEP 8: Update package.json Scripts
+------------------------------------
+Open package.json and update the scripts section:
+
+"scripts": {
+  "compile": "hardhat compile",
+  "deploy": "hardhat ignition deploy ignition/modules/StoreData.ts --network sepolia"
+}
+
+
+STEP 9: Compile the Contract
+-----------------------------
+npm run compile
+
+This will compile your Solidity contract and generate artifacts in the artifacts/ directory.
+
+
+STEP 10: Get Sepolia Testnet ETH
+---------------------------------
+Before deploying, you need Sepolia ETH in your wallet:
+1. Go to https://sepoliafaucet.com or https://faucet.quicknode.com/ethereum/sepolia or https://sepolia-faucet.pk910.de/
+2. Enter your wallet address
+3. Request testnet ETH (usually takes a few minutes)
+
+
+STEP 11: Deploy to Sepolia
+---------------------------
+npm run deploy
+
+After successful deployment, you will see output like:
+"StoreData deployed to: 0x..."
+
+COPY THIS CONTRACT ADDRESS - you will need it for the API!
+
+
+================================================================================
+PART 2: SETTING UP NODE.JS API PROJECT
+================================================================================
+
+STEP 12: Create API Directory
+------------------------------
+Go back to the parent directory (outside hardhat-example):
+cd ..
+mkdir api
+cd api
+
+
+STEP 13: Initialize Node.js Project
+------------------------------------
+npm init -y
+
+
+STEP 14: Install Dependencies
+-------------------------------
+npm install express viem dotenv cors
+npm install --save-dev typescript @types/express @types/node @types/cors tsx
+
+
+STEP 15: Create TypeScript Configuration
+-----------------------------------------
+Create file: tsconfig.json
+
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "lib": ["ES2022"],
+    "moduleResolution": "node",
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
+
+
+STEP 16: Update package.json
+-----------------------------
+Update package.json scripts section:
+
+"scripts": {
+  "build": "tsc",
+  "start": "node dist/index.js",
+  "dev": "tsx watch src/index.ts",
+  "type-check": "tsc --noEmit"
+}
+
+
+STEP 17: Create Project Structure
+----------------------------------
+Create the following directory structure:
+
+api/
+  src/
+    config/
+    routes/
+    services/
+
+
+STEP 18: Create Contract ABI Configuration
+-------------------------------------------
+Create file: src/config/contractABI.ts
+
+// StoreData Contract ABI
+export const storeDataABI = [
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    name: "data",
+    outputs: [
+      {
+        internalType: "string",
+        name: "value1",
+        type: "string",
+      },
+      {
+        internalType: "string",
+        name: "value2",
+        type: "string",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_key",
+        type: "uint256",
+      },
+    ],
+    name: "getData",
+    outputs: [
+      {
+        internalType: "string",
+        name: "",
+        type: "string",
+      },
+      {
+        internalType: "string",
+        name: "",
+        type: "string",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_key",
+        type: "uint256",
+      },
+      {
+        internalType: "string",
+        name: "_value1",
+        type: "string",
+      },
+      {
+        internalType: "string",
+        name: "_value2",
+        type: "string",
+      },
+    ],
+    name: "storeData",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+] as const;
+
+
+STEP 19: Create Contract Service
+---------------------------------
+Create file: src/services/contractService.ts
+
+import { createPublicClient, createWalletClient, http, Address } from "viem";
+import { sepolia } from "viem/chains";
+import { privateKeyToAccount } from "viem/accounts";
+import dotenv from "dotenv";
+import { storeDataABI } from "../config/contractABI.js";
+
+// Load environment variables
+dotenv.config();
+
+const SEPOLIA_RPC_URL = process.env.SEPOLIA_RPC_URL;
+const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS as Address;
+const PRIVATE_KEY = process.env.PRIVATE_KEY;
+
+if (!SEPOLIA_RPC_URL) {
+  throw new Error("SEPOLIA_RPC_URL is not set in environment variables");
+}
+
+if (!CONTRACT_ADDRESS) {
+  throw new Error("CONTRACT_ADDRESS is not set in environment variables");
+}
+
+if (!PRIVATE_KEY) {
+  throw new Error("PRIVATE_KEY is not set in environment variables");
+}
+
+// Create HTTP transport with timeout configuration
+const httpTransport = http(SEPOLIA_RPC_URL, {
+  timeout: 30000,
+  retryCount: 3,
+  retryDelay: 1000,
+});
+
+// Create public client for read operations
+const publicClient = createPublicClient({
+  chain: sepolia,
+  transport: httpTransport,
+});
+
+// Create wallet client for write operations
+const account = privateKeyToAccount(`0x${PRIVATE_KEY.replace(/^0x/, "")}` as `0x${string}`);
+const walletClient = createWalletClient({
+  account,
+  chain: sepolia,
+  transport: httpTransport,
+});
+
+export class ContractService {
+  async storeData(key: number, value1: string, value2: string): Promise<string> {
+    try {
+      // Check account balance
+      const balance = await publicClient.getBalance({ address: account.address });
+      console.log(`Account balance: ${balance.toString()} wei`);
+
+      if (balance === 0n) {
+        throw new Error("Account has zero balance. Please fund your account with Sepolia ETH.");
+      }
+
+      // Check if contract exists
+      const code = await publicClient.getBytecode({ address: CONTRACT_ADDRESS });
+      if (!code || code === "0x") {
+        throw new Error(`No contract found at address ${CONTRACT_ADDRESS}`);
+      }
+
+      // Estimate gas
+      const gasEstimate = await publicClient.estimateContractGas({
+        address: CONTRACT_ADDRESS,
+        abi: storeDataABI,
+        functionName: "storeData",
+        args: [BigInt(key), value1, value2],
+        account: account.address,
+      });
+
+      // Get gas price
+      const gasPrice = await publicClient.getGasPrice();
+      const estimatedCost = gasEstimate * gasPrice;
+
+      if (balance < estimatedCost) {
+        throw new Error(`Insufficient balance for gas`);
+      }
+
+      // Execute the transaction
+      const hash = await walletClient.writeContract({
+        address: CONTRACT_ADDRESS,
+        abi: storeDataABI,
+        functionName: "storeData",
+        args: [BigInt(key), value1, value2],
+      });
+
+      // Wait for transaction receipt
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+      if (receipt.status === "reverted") {
+        throw new Error("Transaction was reverted");
+      }
+
+      return receipt.transactionHash;
+    } catch (error) {
+      console.error("Error storing data:", error);
+      throw new Error(`Failed to store data: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  async getData(key: number): Promise<{ value1: string; value2: string }> {
+    try {
+      const result = await publicClient.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: storeDataABI,
+        functionName: "getData",
+        args: [BigInt(key)],
+      });
+
+      return {
+        value1: result[0],
+        value2: result[1],
+      };
+    } catch (error) {
+      console.error("Error getting data:", error);
+      throw new Error(`Failed to get data: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  getContractAddress(): string {
+    return CONTRACT_ADDRESS;
+  }
+}
+
+export const contractService = new ContractService();
+
+
+STEP 20: Create API Routes
+---------------------------
+Create file: src/routes/dataRoutes.ts
+
+import { Router, Request, Response } from "express";
+import { contractService } from "../services/contractService.js";
+
+const router = Router();
+
+/**
+ * POST /api/store
+ * Store data on the blockchain
+ * Body: { key: number, value1: string, value2: string }
+ */
+router.post("/store", async (req: Request, res: Response) => {
+  try {
+    const { key, value1, value2 } = req.body;
+
+    // Validate input
+    if (key === undefined || value1 === undefined || value2 === undefined) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields: key, value1, and value2 are required",
+      });
+    }
+
+    if (typeof key !== "number" || key < 0) {
+      return res.status(400).json({
+        success: false,
+        error: "key must be a non-negative number",
+      });
+    }
+
+    if (typeof value1 !== "string" || typeof value2 !== "string") {
+      return res.status(400).json({
+        success: false,
+        error: "value1 and value2 must be strings",
+      });
+    }
+
+    const txHash = await contractService.storeData(key, value1, value2);
+
+    res.json({
+      success: true,
+      message: "Data stored successfully",
+      transactionHash: txHash,
+      data: {
+        key,
+        value1,
+        value2,
+      },
+    });
+  } catch (error) {
+    console.error("Error in /store endpoint:", error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+});
+
+/**
+ * GET /api/get/:key
+ * Get data from the blockchain
+ * Params: key (number)
+ */
+router.get("/get/:key", async (req: Request, res: Response) => {
+  try {
+    const key = parseInt(req.params.key, 10);
+
+    if (isNaN(key) || key < 0) {
+      return res.status(400).json({
+        success: false,
+        error: "key must be a valid non-negative number",
+      });
+    }
+
+    const data = await contractService.getData(key);
+
+    res.json({
+      success: true,
+      data: {
+        key,
+        ...data,
+      },
+    });
+  } catch (error) {
+    console.error("Error in /get endpoint:", error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+});
+
+/**
+ * GET /api/contract-address
+ * Get the contract address
+ */
+router.get("/contract-address", async (req: Request, res: Response) => {
+  try {
+    const address = contractService.getContractAddress();
+    res.json({
+      success: true,
+      contractAddress: address,
+    });
+  } catch (error) {
+    console.error("Error getting contract address:", error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+});
+
+export default router;
+
+
+STEP 21: Create Main Server File
+---------------------------------
+Create file: src/index.ts
+
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import dataRoutes from "./routes/dataRoutes.js";
+
+// Load environment variables
+dotenv.config();
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Health check endpoint
+app.get("/health", (req, res) => {
+  res.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// API routes
+app.use("/api", dataRoutes);
+
+// Error handling middleware
+app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error("Unhandled error:", err);
+  res.status(500).json({
+    success: false,
+    error: "Internal server error",
+  });
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    error: "Route not found",
+  });
+});
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📍 Health check: http://localhost:${PORT}/health`);
+  console.log(`📍 API endpoints:`);
+  console.log(`   POST http://localhost:${PORT}/api/store`);
+  console.log(`   GET  http://localhost:${PORT}/api/get/:key`);
+  console.log(`   GET  http://localhost:${PORT}/api/contract-address`);
+});
+
+
+STEP 22: Create API .env File
+------------------------------
+Create file: .env (in the api directory)
+
+Add the following variables:
+
+SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/YOUR_INFURA_KEY
+CONTRACT_ADDRESS=0xYourDeployedContractAddressFromStep11
+PRIVATE_KEY=your_private_key_here_without_0x_prefix
+PORT=3000
+
+IMPORTANT:
+- Use the SAME Infura key and private key from the Hardhat project
+- Replace CONTRACT_ADDRESS with the address you got from Step 11
+- Remove 0x prefix from private key if present
+
+
+STEP 23: Build the API
+----------------------
+npm run build
+
+This compiles TypeScript to JavaScript in the dist/ directory.
+
+
+STEP 24: Start the API Server
+------------------------------
+npm run dev
+
+Or for production:
+npm start
+
+The server should start on port 3000 (or the port specified in .env).
+
+
+================================================================================
+PART 3: TESTING WITH POSTMAN
+================================================================================
+
+STEP 25: Test Health Endpoint
+------------------------------
+Method: GET
+URL: http://localhost:3000/health
+
+Expected Response:
+{
+  "status": "ok",
+  "timestamp": "2024-01-01T12:00:00.000Z"
+}
+
+
+STEP 26: Test Get Contract Address
+------------------------------------
+Method: GET
+URL: http://localhost:3000/api/contract-address
+
+Expected Response:
+{
+  "success": true,
+  "contractAddress": "0x..."
+}
+
+
+STEP 27: Test Store Data
+-------------------------
+Method: POST
+URL: http://localhost:3000/api/store
+
+Headers:
+Content-Type: application/json
+
+Body (raw JSON):
+{
+  "key": 1,
+  "value1": "Hello",
+  "value2": "World"
+}
+
+Expected Response:
+{
+  "success": true,
+  "message": "Data stored successfully",
+  "transactionHash": "0x...",
+  "data": {
+    "key": 1,
+    "value1": "Hello",
+    "value2": "World"
+  }
+}
+
+NOTE: This will send a transaction to Sepolia and may take 10-30 seconds.
+
+
+STEP 28: Test Get Data
+----------------------
+Method: GET
+URL: http://localhost:3000/api/get/1
+
+Expected Response:
+{
+  "success": true,
+  "data": {
+    "key": 1,
+    "value1": "Hello",
+    "value2": "World"
+  }
+}
+
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+1. "RPC request timed out"
+   - Check your internet connection
+   - Verify your Infura key is correct
+   - Try using a different RPC provider (Alchemy, QuickNode)
+
+2. "Account has zero balance"
+   - Get Sepolia ETH from a faucet
+   - Verify you're using the correct network
+
+3. "No contract found at address"
+   - Verify the contract address is correct
+   - Make sure you deployed to Sepolia, not a different network
+   - Check the address on Sepolia Etherscan
+
+4. "Transaction was reverted"
+   - Check the transaction on Etherscan for revert reason
+   - Verify your contract ABI matches the deployed contract
+   - Ensure you have enough ETH for gas
+
+5. TypeScript compilation errors
+   - Run: npm install
+   - Check that all dependencies are installed
+   - Verify tsconfig.json is correct
+
+6. Module not found errors
+   - Make sure you're using .js extensions in imports (TypeScript requirement)
+   - Run: npm run build
+   - Check that dist/ directory exists after build
+
+7. Port already in use
+   - Change PORT in .env file
+   - Or kill the process using the port
+
+
+================================================================================
+SUMMARY OF COMMANDS
+================================================================================
+
+HARDHAT PROJECT:
+----------------
+mkdir hardhat-example
+cd hardhat-example
+npx hardhat --init
+npm install dotenv
+npm install --save-dev @nomicfoundation/hardhat-ignition @nomicfoundation/hardhat-toolbox-viem
+# Create contract and ignition module (see steps above)
+# Create .env file
+# Update hardhat.config.ts
+# Update package.json scripts
+npm run compile
+npm run deploy
+
+API PROJECT:
+------------
+cd ..
+mkdir api
+cd api
+npm init -y
+npm install express viem dotenv cors
+npm install --save-dev typescript @types/express @types/node @types/cors tsx
+# Create tsconfig.json
+# Create all source files (see steps above)
+# Create .env file
+npm run build
+npm run dev
+
+
+================================================================================
+FINAL CHECKLIST
+================================================================================
+
+✓ Hardhat project initialized
+✓ Contract created and compiled
+✓ Contract deployed to Sepolia
+✓ Contract address copied
+✓ API project created
+✓ All dependencies installed
+✓ Environment variables configured
+✓ API server running
+✓ Postman tests passing
+
+================================================================================
+END OF GUIDE
+================================================================================
